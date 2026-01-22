@@ -10,7 +10,8 @@ pip install tqdm
 pip install pytorch-crf
 pip install transformers
 
-# 训练BiLSTM-CRF
+# 训练model
+python train.py --model <model>
 python train.py --model bilstm-crf
 
 # 评估模型

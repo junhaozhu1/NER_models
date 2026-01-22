@@ -12,11 +12,23 @@ from datetime import datetime
 # 导入自定义模块
 from data.utils import get_dataloader
 from models.bilstm_crf import BiLSTMCRF
-# from models.bert_crf import BertCRF
+from models.bert_crf import BertCRF
 import config
 
 warnings.filterwarnings('ignore')
 
+def compute_loss(model, model_name, word_ids, label_ids, mask, lengths):
+    """统一的loss计算接口"""
+    if model_name == 'bert-crf':
+        return model.loss(word_ids, label_ids, mask)
+    else:  # bilstm-crf 或其他需要lengths的模型
+        return model.loss(word_ids, label_ids, mask, lengths)
+def predict_batch(model, model_name, word_ids, mask, lengths):
+    """统一的预测接口"""
+    if model_name == 'bert-crf':
+        return model.predict(word_ids, mask)
+    else:
+        return model.predict(word_ids, mask, lengths)
 
 def train_model(model_name='bilstm-crf'):
     """
@@ -64,14 +76,12 @@ def train_model(model_name='bilstm-crf'):
             dropout=cfg['dropout']
         )
     elif model_name == 'bert-crf':
-        # 如果实现了BERT-CRF模型
-        # from models.bert_crf import BertCRF
-        # model = BertCRF(
-        #     bert_model_name=cfg['bert_model'],
-        #     num_labels=len(train_dataset.label2idx),
-        #     dropout=cfg['dropout']
-        # )
-        raise NotImplementedError(f"模型 {model_name} 尚未实现")
+        model = BertCRF(
+            bert_model_name=cfg['bert_model'],
+            num_labels=len(train_dataset.label2idx),
+            dropout=cfg['dropout']
+        )
+        # raise NotImplementedError(f"模型 {model_name} 尚未实现")
     else:
         raise ValueError(f"未知的模型: {model_name}")
 
@@ -120,8 +130,11 @@ def train_model(model_name='bilstm-crf'):
 
                 # 前向传播和反向传播
                 if use_amp:
+                    # with autocast():
+                    #     loss = model.loss(word_ids, label_ids, mask, lengths)
+                    # scaler.scale(loss).backward()
                     with autocast():
-                        loss = model.loss(word_ids, label_ids, mask, lengths)
+                        loss = compute_loss(model, model_name, word_ids, label_ids, mask, lengths)
                     scaler.scale(loss).backward()
 
                     # 梯度裁剪
@@ -132,7 +145,9 @@ def train_model(model_name='bilstm-crf'):
                     scaler.step(optimizer)
                     scaler.update()
                 else:
-                    loss = model.loss(word_ids, label_ids, mask, lengths)
+                    # loss = model.loss(word_ids, label_ids, mask, lengths)
+                    # loss.backward()
+                    loss = compute_loss(model, model_name, word_ids, label_ids, mask, lengths)
                     loss.backward()
 
                     # 梯度裁剪
@@ -187,7 +202,7 @@ def train_model(model_name='bilstm-crf'):
     return model, train_dataset
 
 
-def evaluate_model(model, test_loader, test_dataset, device):
+def evaluate_model(model, model_name, test_loader, test_dataset, device):
     """
     评估模型性能
 
@@ -206,7 +221,8 @@ def evaluate_model(model, test_loader, test_dataset, device):
             lengths = lengths.to(device)
 
             # 预测
-            predictions = model.predict(word_ids, mask, lengths)
+            # predictions = model.predict(word_ids, mask, lengths)
+            predictions = predict_batch(model, model_name, word_ids, mask, lengths)
 
             # 收集预测结果
             for i, length in enumerate(lengths):
