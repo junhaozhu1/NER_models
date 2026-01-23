@@ -82,6 +82,25 @@ def train_model(model_name='bilstm-crf'):
             dropout=cfg['dropout']
         )
         # raise NotImplementedError(f"模型 {model_name} 尚未实现")
+    elif model_name == 'can-ner':
+        from models.can_ner import CANNER
+        model = CANNER(
+            vocab_size=len(train_dataset.word2idx),
+            num_labels=len(train_dataset.label2idx),
+            embedding_dim=cfg['embedding_dim'],
+            hidden_dim=cfg['hidden_dim'],
+            num_layers=cfg['num_layers'],
+            num_heads=cfg['num_heads'],
+            dropout=cfg['dropout']
+        )
+    elif model_name == 'can-ner-bert':
+        from models.can_ner import CANNERWithBERT
+        model = CANNERWithBERT(
+            bert_model_name=cfg['bert_model'],
+            num_labels=len(train_dataset.label2idx),
+            num_heads=cfg['num_heads'],
+            dropout=cfg['dropout']
+        )
     else:
         raise ValueError(f"未知的模型: {model_name}")
 
@@ -268,7 +287,7 @@ def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='训练NER模型')
     parser.add_argument('--model', type=str, default='bilstm-crf',
-                        choices=['bilstm-crf', 'bert-crf'],
+                        choices=['bilstm-crf', 'bert-crf', 'can-ner'],
                         help='选择要训练的模型')
     parser.add_argument('--epochs', type=int, default=None,
                         help='训练轮数（覆盖配置文件中的设置）')
