@@ -14,6 +14,9 @@ from data.utils import get_dataloader
 from models.bilstm_crf import BiLSTMCRF
 from models.bert_crf import BertCRF
 from models.w2ner import W2NER
+from models.lattice_lstm import LatticeLSTM
+from data.lexicon import Lexicon, create_lexicon_from_training_data
+from data.utils import get_lattice_dataloader
 import config
 
 warnings.filterwarnings('ignore')
@@ -82,7 +85,6 @@ def train_model(model_name='bilstm-crf'):
             num_labels=len(train_dataset.label2idx),
             dropout=cfg['dropout']
         )
-        # raise NotImplementedError(f"模型 {model_name} 尚未实现")
     elif model_name == 'can-ner':
         from models.can_ner import CANNER
         model = CANNER(
@@ -110,6 +112,45 @@ def train_model(model_name='bilstm-crf'):
             hidden_size=cfg['hidden_size'],
             conv_channels=cfg['conv_channels'],
             num_heads=cfg['num_heads'],
+            dropout=cfg['dropout']
+        )
+    elif model_name == 'lattice-lstm':
+        # 加载或创建词典
+        lexicon_path = cfg.get('lexicon_path', 'data/lexicon.pkl')
+        if os.path.exists(lexicon_path):
+            print("加载已有词典...")
+            lexicon = Lexicon()
+            lexicon.load(lexicon_path)
+        else:
+            print("从训练数据创建词典...")
+            lexicon = create_lexicon_from_training_data(config.TRAIN_FILE)
+            lexicon.save(lexicon_path)
+
+        # 加载数据
+        train_loader, train_dataset = get_lattice_dataloader(
+            config.TRAIN_FILE,
+            lexicon,
+            batch_size=cfg['batch_size'],
+            shuffle=True
+        )
+
+        test_loader, test_dataset = get_lattice_dataloader(
+            config.TEST_FILE,
+            lexicon,
+            batch_size=cfg['batch_size'],
+            shuffle=False,
+            word2idx=train_dataset.word2idx,
+            label2idx=train_dataset.label2idx
+        )
+
+        # 创建模型
+        model = LatticeLSTM(
+            char_vocab_size=len(train_dataset.word2idx),
+            word_vocab_size=len(lexicon.word2idx),
+            num_labels=len(train_dataset.label2idx),
+            char_dim=cfg['char_dim'],
+            word_dim=cfg['word_dim'],
+            hidden_dim=cfg['hidden_dim'],
             dropout=cfg['dropout']
         )
     else:

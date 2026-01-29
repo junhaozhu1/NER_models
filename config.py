@@ -65,6 +65,18 @@ MODEL_CONFIGS = {
         'use_amp': True,
         'gradient_clip': 1.0,
         'warmup_steps': 500
+    },
+    'lattice-lstm': {
+        'char_dim': 100,
+        'word_dim': 100,
+        'hidden_dim': 256,
+        'dropout': 0.5,
+        'learning_rate': 0.001,
+        'batch_size': 16,  # Lattice LSTM计算量较大，使用较小的batch
+        'epochs': 30,
+        'use_amp': False,  # Lattice LSTM不建议使用混合精度
+        'gradient_clip': 5.0,
+        'lexicon_path': 'data/lexicon.pkl'  # 词典路径
     }
 }
 
