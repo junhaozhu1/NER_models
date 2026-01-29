@@ -13,6 +13,7 @@ from datetime import datetime
 from data.utils import get_dataloader
 from models.bilstm_crf import BiLSTMCRF
 from models.bert_crf import BertCRF
+from models.w2ner import W2NER
 import config
 
 warnings.filterwarnings('ignore')
@@ -98,6 +99,16 @@ def train_model(model_name='bilstm-crf'):
         model = CANNERWithBERT(
             bert_model_name=cfg['bert_model'],
             num_labels=len(train_dataset.label2idx),
+            num_heads=cfg['num_heads'],
+            dropout=cfg['dropout']
+        )
+    elif model_name == 'w2ner':
+        model = W2NER(
+            bert_model_name=cfg['bert_model'],
+            num_labels=len(train_dataset.label2idx),
+            dist_emb_dim=cfg['dist_emb_dim'],
+            hidden_size=cfg['hidden_size'],
+            conv_channels=cfg['conv_channels'],
             num_heads=cfg['num_heads'],
             dropout=cfg['dropout']
         )
@@ -221,7 +232,7 @@ def train_model(model_name='bilstm-crf'):
     return model, train_dataset
 
 
-def evaluate_model(model, model_name, test_loader, test_dataset, device):
+def evaluate_model(model, test_loader, test_dataset, device):
     """
     评估模型性能
 
@@ -232,6 +243,9 @@ def evaluate_model(model, model_name, test_loader, test_dataset, device):
     all_true = []
     all_pred = []
 
+    # 获取模型类型（用于判断是否需要特殊处理）
+    model_type = model.__class__.__name__.lower()
+
     with torch.no_grad():
         for batch in tqdm(test_loader, desc='评估中'):
             word_ids, label_ids, mask, lengths = batch
@@ -239,17 +253,21 @@ def evaluate_model(model, model_name, test_loader, test_dataset, device):
             mask = mask.to(device)
             lengths = lengths.to(device)
 
-            # 预测
-            # predictions = model.predict(word_ids, mask, lengths)
-            predictions = predict_batch(model, model_name, word_ids, mask, lengths)
+            # 预测 - 所有模型都使用相同的接口
+            predictions = model.predict(word_ids, mask, lengths)
 
             # 收集预测结果
             for i, length in enumerate(lengths):
                 true_labels = label_ids[i][:length].tolist()
-                pred_labels = predictions[i][:length]
+                pred_labels = predictions[i][:length] if len(predictions[i]) >= length else predictions[i]
+
+                # 确保预测结果长度正确
+                if len(pred_labels) < length:
+                    # 用O标签填充
+                    pred_labels.extend([0] * (length - len(pred_labels)))
 
                 all_true.extend([test_dataset.idx2label[l] for l in true_labels])
-                all_pred.extend([test_dataset.idx2label[l] for l in pred_labels])
+                all_pred.extend([test_dataset.idx2label[l] for l in pred_labels[:length]])
 
     # 计算指标
     from sklearn.metrics import precision_recall_fscore_support, classification_report
@@ -287,7 +305,7 @@ def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='训练NER模型')
     parser.add_argument('--model', type=str, default='bilstm-crf',
-                        choices=['bilstm-crf', 'bert-crf', 'can-ner'],
+                        choices=['bilstm-crf', 'bert-crf', 'can-ner', 'w2ner'],
                         help='选择要训练的模型')
     parser.add_argument('--epochs', type=int, default=None,
                         help='训练轮数（覆盖配置文件中的设置）')

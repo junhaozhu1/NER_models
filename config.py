@@ -51,6 +51,20 @@ MODEL_CONFIGS = {
         'use_amp': True,
         'gradient_clip': 1.0,
         'warmup_steps': 500
+    },
+'w2ner': {
+        'bert_model': 'bert-base-chinese',
+        'dist_emb_dim': 64,
+        'hidden_size': 768,
+        'conv_channels': 128,
+        'num_heads': 8,
+        'dropout': 0.3,
+        'learning_rate': 2e-5,
+        'batch_size': 16,
+        'epochs': 20,
+        'use_amp': True,
+        'gradient_clip': 1.0,
+        'warmup_steps': 500
     }
 }
 
