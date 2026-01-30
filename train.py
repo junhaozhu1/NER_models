@@ -14,6 +14,7 @@ from data.utils import get_dataloader
 from models.bilstm_crf import BiLSTMCRF
 from models.bert_crf import BertCRF
 from models.w2ner import W2NER
+from models.flat import FLAT, FLATWithLexicon
 from models.lattice_lstm import LatticeLSTM
 from data.lexicon import Lexicon, create_lexicon_from_training_data
 from data.utils import get_lattice_dataloader
@@ -153,6 +154,31 @@ def train_model(model_name='bilstm-crf'):
             hidden_dim=cfg['hidden_dim'],
             dropout=cfg['dropout']
         )
+    elif model_name == 'flat':
+        model = FLAT(
+            vocab_size=len(train_dataset.word2idx),
+            num_labels=len(train_dataset.label2idx),
+            d_model=cfg.get('d_model', 256),
+            n_heads=cfg.get('n_heads', 8),
+            n_layers=cfg.get('n_layers', 2),
+            d_ff=cfg.get('d_ff', 1024),
+            dropout=cfg.get('dropout', 0.3),
+            use_bigram=cfg.get('use_bigram', True),
+            bigram_vocab_size=len(train_dataset.bigram2idx) if hasattr(train_dataset, 'bigram2idx') else None
+        )
+    elif model_name == 'flat-lexicon':
+        # 如果有词典文件，加载词典
+        lexicon_size = cfg.get('lexicon_size', 50000)  # 或从词典文件获取
+        model = FLATWithLexicon(
+            vocab_size=len(train_dataset.word2idx),
+            num_labels=len(train_dataset.label2idx),
+            lexicon_size=lexicon_size,
+            d_model=cfg.get('d_model', 256),
+            n_heads=cfg.get('n_heads', 8),
+            n_layers=cfg.get('n_layers', 3),
+            d_ff=cfg.get('d_ff', 1024),
+            dropout=cfg.get('dropout', 0.3)
+        )
     else:
         raise ValueError(f"未知的模型: {model_name}")
 
@@ -188,13 +214,28 @@ def train_model(model_name='bilstm-crf'):
 
         with tqdm(train_loader, desc=f'Epoch {epoch + 1}/{cfg["epochs"]}') as pbar:
             for batch_idx, batch in enumerate(pbar):
-                word_ids, label_ids, mask, lengths = batch
+                # word_ids, label_ids, mask, lengths = batch
+                #
+                # # 将数据移到设备上
+                # word_ids = word_ids.to(device)
+                # label_ids = label_ids.to(device)
+                # mask = mask.to(device)
+                # lengths = lengths.to(device)
 
-                # 将数据移到设备上
-                word_ids = word_ids.to(device)
-                label_ids = label_ids.to(device)
-                mask = mask.to(device)
-                lengths = lengths.to(device)
+                if model_name in ['flat', 'flat-lexicon']:
+                    word_ids, label_ids, bigram_ids, mask, lengths = batch
+                    word_ids = word_ids.to(device)
+                    label_ids = label_ids.to(device)
+                    bigram_ids = bigram_ids.to(device)
+                    mask = mask.to(device)
+                    lengths = lengths.to(device)
+                else:
+                    word_ids, label_ids, mask, lengths = batch
+                    word_ids = word_ids.to(device)
+                    label_ids = label_ids.to(device)
+                    mask = mask.to(device)
+                    lengths = lengths.to(device)
+                    bigram_ids = None
 
                 # 梯度清零
                 optimizer.zero_grad(set_to_none=True)
@@ -205,7 +246,11 @@ def train_model(model_name='bilstm-crf'):
                     #     loss = model.loss(word_ids, label_ids, mask, lengths)
                     # scaler.scale(loss).backward()
                     with autocast():
-                        loss = compute_loss(model, model_name, word_ids, label_ids, mask, lengths)
+                        # loss = compute_loss(model, model_name, word_ids, label_ids, mask, lengths)
+                        if model_name in ['flat', 'flat-lexicon']:
+                            loss = model.loss(word_ids, label_ids, mask, bigram_ids)
+                        else:
+                            loss = model.loss(word_ids, label_ids, mask, lengths)
                     scaler.scale(loss).backward()
 
                     # 梯度裁剪
@@ -218,7 +263,11 @@ def train_model(model_name='bilstm-crf'):
                 else:
                     # loss = model.loss(word_ids, label_ids, mask, lengths)
                     # loss.backward()
-                    loss = compute_loss(model, model_name, word_ids, label_ids, mask, lengths)
+                    # loss = compute_loss(model, model_name, word_ids, label_ids, mask, lengths)
+                    if model_name in ['flat', 'flat-lexicon']:
+                        loss = model.loss(word_ids, label_ids, mask, bigram_ids)
+                    else:
+                        loss = model.loss(word_ids, label_ids, mask, lengths)
                     loss.backward()
 
                     # 梯度裁剪
@@ -273,7 +322,7 @@ def train_model(model_name='bilstm-crf'):
     return model, train_dataset
 
 
-def evaluate_model(model, test_loader, test_dataset, device):
+def evaluate_model(model, test_loader, test_dataset, device, model_name='bilstm-crf'):
     """
     评估模型性能
 
@@ -289,13 +338,31 @@ def evaluate_model(model, test_loader, test_dataset, device):
 
     with torch.no_grad():
         for batch in tqdm(test_loader, desc='评估中'):
-            word_ids, label_ids, mask, lengths = batch
-            word_ids = word_ids.to(device)
-            mask = mask.to(device)
-            lengths = lengths.to(device)
+            # word_ids, label_ids, mask, lengths = batch
+            # word_ids = word_ids.to(device)
+            # mask = mask.to(device)
+            # lengths = lengths.to(device)
+            #
+            # # 预测 - 所有模型都使用相同的接口
+            # predictions = model.predict(word_ids, mask, lengths)
 
-            # 预测 - 所有模型都使用相同的接口
-            predictions = model.predict(word_ids, mask, lengths)
+            if model_name in ['flat', 'flat-lexicon']:
+                word_ids, label_ids, bigram_ids, mask, lengths = batch
+                word_ids = word_ids.to(device)
+                bigram_ids = bigram_ids.to(device)
+                mask = mask.to(device)
+                lengths = lengths.to(device)
+
+                # 预测
+                predictions = model.predict(word_ids, mask, bigram_ids)
+            else:
+                word_ids, label_ids, mask, lengths = batch
+                word_ids = word_ids.to(device)
+                mask = mask.to(device)
+                lengths = lengths.to(device)
+
+                # 预测
+                predictions = model.predict(word_ids, mask, lengths)
 
             # 收集预测结果
             for i, length in enumerate(lengths):
@@ -346,7 +413,7 @@ def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='训练NER模型')
     parser.add_argument('--model', type=str, default='bilstm-crf',
-                        choices=['bilstm-crf', 'bert-crf', 'can-ner', 'w2ner'],
+                        choices=['bilstm-crf', 'bert-crf', 'can-ner', 'w2ner', 'flat'],
                         help='选择要训练的模型')
     parser.add_argument('--epochs', type=int, default=None,
                         help='训练轮数（覆盖配置文件中的设置）')

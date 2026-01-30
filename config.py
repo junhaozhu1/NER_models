@@ -52,7 +52,7 @@ MODEL_CONFIGS = {
         'gradient_clip': 1.0,
         'warmup_steps': 500
     },
-'w2ner': {
+    'w2ner': {
         'bert_model': 'bert-base-chinese',
         'dist_emb_dim': 64,
         'hidden_size': 768,
@@ -77,6 +77,34 @@ MODEL_CONFIGS = {
         'use_amp': False,  # Lattice LSTM不建议使用混合精度
         'gradient_clip': 5.0,
         'lexicon_path': 'data/lexicon.pkl'  # 词典路径
+    },
+    'flat': {
+        'd_model': 256,
+        'n_heads': 8,
+        'n_layers': 2,
+        'd_ff': 1024,
+        'dropout': 0.3,
+        'use_bigram': True,
+        'learning_rate': 0.001,
+        'batch_size': 32,
+        'epochs': 30,
+        'use_amp': True,
+        'gradient_clip': 5.0,
+        'warmup_steps': 1000
+    },
+
+    'flat-lexicon': {
+        'd_model': 256,
+        'n_heads': 8,
+        'n_layers': 3,
+        'd_ff': 1024,
+        'dropout': 0.3,
+        'learning_rate': 0.0005,
+        'batch_size': 32,
+        'epochs': 30,
+        'use_amp': True,
+        'gradient_clip': 5.0,
+        'warmup_steps': 2000
     }
 }
 
