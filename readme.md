@@ -1,20 +1,51 @@
-# 安装依赖
+# 使用说明
 
-## 安装所有依赖
+## 项目结构
+
+```
+NER_models/
+├── data/
+│   └── msra/
+│       ├── train.txt
+│       └── test.txt
+├── models/
+│   ├── __init__.py
+│   ├── base_model.py
+│   ├── bilstm_crf.py
+│   ├── bert_crf.py
+│   ├── can_ner.py
+│   ├── lattice_lstm.py
+│   ├── w2ner.py
+│   ├── flat.py
+│   ├── softlexicon.py
+│   ├── lebert.py
+│   ├── mect.py
+│   └── zen.py
+├── utils/
+│   ├── __init__.py
+│   ├── data_loader.py
+│   ├── metrics.py
+│   └── visualization.py
+├── configs/
+│   └── config.py
+├── main.py
+└── requirements.txt
+
+```
+
+## 安装依赖:
+
+```
 pip install -r requirements.txt
-## 或者单独安装
-pip install torch>=1.8.0
-pip install numpy
-pip install scikit-learn
-pip install tqdm
-pip install pytorch-crf
-pip install transformers
+```
 
-# 训练model
-python train.py --model <model>
-python train.py --model bilstm-crf
+## 准备数据:
 
-# 评估模型
-python evaluate.py
+将MSRA数据集放在data/msra/目录下
 
-bugs: bert-crf flat
+## 运行基准测试:
+
+```
+python main.py
+```
+
