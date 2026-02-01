@@ -16,3 +16,5 @@ python train.py --model bilstm-crf
 
 # 评估模型
 python evaluate.py
+
+bugs: bert-crf flat

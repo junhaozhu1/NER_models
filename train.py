@@ -413,7 +413,7 @@ def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='训练NER模型')
     parser.add_argument('--model', type=str, default='bilstm-crf',
-                        choices=['bilstm-crf', 'bert-crf', 'can-ner', 'w2ner', 'flat'],
+                        choices=['bilstm-crf', 'bert-crf', 'can-ner', 'w2ner', 'flat', 'lattice-lstm'],
                         help='选择要训练的模型')
     parser.add_argument('--epochs', type=int, default=None,
                         help='训练轮数（覆盖配置文件中的设置）')
