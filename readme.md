@@ -25,7 +25,7 @@ NER_models/
 │   ├── __init__.py
 │   ├── data_loader.py
 │   ├── metrics.py
-│   └── visualization.py
+│   └── visualization.py # didn't implement
 ├── configs/
 │   └── config.py
 ├── main.py
