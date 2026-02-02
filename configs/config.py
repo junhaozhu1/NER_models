@@ -3,7 +3,7 @@ import os
 
 class Config:
     # 数据路径
-    DATA_DIR = "../data/msra"
+    DATA_DIR = "data/msra"
     TRAIN_FILE = os.path.join(DATA_DIR, "train.txt")
     TEST_FILE = os.path.join(DATA_DIR, "test.txt")
 
