@@ -142,5 +142,143 @@
         "type_error": 438
       }
     }
+  },
+  "SoftLexicon": {
+    "precision": 0.17092825042615836,
+    "recall": 0.05488654458598726,
+    "f1": 0.08309164186975027,
+    "accuracy": 0.8544040880412048,
+    "classification_report": "              precision    recall  f1-score   support\n\n           O      0.89      0.96      0.92     152505\n       B-ORG      0.03      0.01      0.01       1331\n       I-ORG      0.02      0.01      0.01       5670\n       B-PER      0.11      0.05      0.07       1973\n       I-PER      0.07      0.03      0.04       3851\n       B-LOC      0.04      0.01      0.02       2877\n       I-LOC      0.02      0.00      0.00       4394\n\n   avg/total      0.17      0.15      0.15     172601\n",
+    "entity_metrics": {
+      "ORG": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0,
+        "support": 1331
+      },
+      "PER": {
+        "precision": 0.04691075514874142,
+        "recall": 0.020780537252914344,
+        "f1": 0.028802247980330174,
+        "support": 1973
+      },
+      "LOC": {
+        "precision": 0.020802377414561663,
+        "recall": 0.004866180048661801,
+        "f1": 0.007887323943661971,
+        "support": 2877
+      }
+    },
+    "performance_metrics": {
+      "avg_inference_time": 0.019790337903656228,
+      "std_inference_time": 0.0009803391585774142,
+      "total_inference_time": 2.7112762928009033,
+      "samples_per_second": 1609.942893533254
+    },
+    "error_analysis": {
+      "total_errors": 25130,
+      "error_distribution": {
+        "false_negative": 0.7557898925586948,
+        "false_positive": 0.21289295662554716,
+        "boundary_error": 0.01846398726621568,
+        "type_error": 0.01285316354954238
+      },
+      "error_counts": {
+        "false_negative": 18993,
+        "false_positive": 5350,
+        "boundary_error": 464,
+        "type_error": 323
+      }
+    }
+  },
+  "LEBERT": {
+    "precision": 0.1493844049247606,
+    "recall": 0.054339171974522295,
+    "f1": 0.07969057870539299,
+    "accuracy": 0.8491491938053661,
+    "classification_report": "              precision    recall  f1-score   support\n\n           O      0.89      0.96      0.92     152505\n       B-ORG      0.00      0.00      0.00       1331\n       I-ORG      0.01      0.00      0.00       5670\n       B-PER      0.13      0.06      0.08       1973\n       I-PER      0.00      0.00      0.00       3851\n       B-LOC      0.05      0.04      0.04       2877\n       I-LOC      0.03      0.01      0.01       4394\n\n   avg/total      0.16      0.15      0.15     172601\n",
+    "entity_metrics": {
+      "ORG": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0,
+        "support": 1331
+      },
+      "PER": {
+        "precision": 0.0010845986984815619,
+        "recall": 0.0005068423720223011,
+        "f1": 0.000690846286701209,
+        "support": 1973
+      },
+      "LOC": {
+        "precision": 0.01788685524126456,
+        "recall": 0.014946124435175531,
+        "f1": 0.016284794546487413,
+        "support": 2877
+      }
+    },
+    "performance_metrics": {
+      "avg_inference_time": 0.8067410740539105,
+      "std_inference_time": 0.0419320983746514,
+      "total_inference_time": 110.52352714538574,
+      "samples_per_second": 39.49385359605975
+    },
+    "error_analysis": {
+      "total_errors": 26037,
+      "error_distribution": {
+        "false_negative": 0.7298843952836348,
+        "false_positive": 0.23881399546798787,
+        "boundary_error": 0.022698467565387716,
+        "type_error": 0.008603141682989592
+      },
+      "error_counts": {
+        "false_negative": 19004,
+        "false_positive": 6218,
+        "boundary_error": 591,
+        "type_error": 224
+      }
+    }
+  },
+  "MECT": {
+    "precision": 0,
+    "recall": 0.0,
+    "f1": 0,
+    "accuracy": 0.8835696201064884,
+    "classification_report": "              precision    recall  f1-score   support\n\n           O      0.88      1.00      0.94     152505\n       B-ORG      0.00      0.00      0.00       1331\n       I-ORG      0.00      0.00      0.00       5670\n       B-PER      0.00      0.00      0.00       1973\n       I-PER      0.00      0.00      0.00       3851\n       B-LOC      0.00      0.00      0.00       2877\n       I-LOC      0.00      0.00      0.00       4394\n\n   avg/total      0.13      0.14      0.13     172601\n",
+    "entity_metrics": {
+      "ORG": {
+        "precision": 0,
+        "recall": 0.0,
+        "f1": 0,
+        "support": 1331
+      },
+      "PER": {
+        "precision": 0,
+        "recall": 0.0,
+        "f1": 0,
+        "support": 1973
+      },
+      "LOC": {
+        "precision": 0,
+        "recall": 0.0,
+        "f1": 0,
+        "support": 2877
+      }
+    },
+    "performance_metrics": {
+      "avg_inference_time": 0.23157895568513523,
+      "std_inference_time": 0.013719657694130893,
+      "total_inference_time": 31.726316928863525,
+      "samples_per_second": 137.58294130980175
+    },
+    "error_analysis": {
+      "total_errors": 20096,
+      "error_distribution": {
+        "false_negative": 1.0
+      },
+      "error_counts": {
+        "false_negative": 20096
+      }
+    }
   }
 }

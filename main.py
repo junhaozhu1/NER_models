@@ -23,10 +23,10 @@ from models.can_ner import CANNERModel
 from models.lattice_lstm import LatticeLSTMModel
 from models.w2ner import W2NERModel
 from models.flat import FLATModel
-# from models.softlexicon import SoftLexiconModel
-# from models.lebert import LEBERTModel
-# from models.mect import MECTModel
-# from models.zen import ZENModel
+from models.softlexicon import SoftLexiconModel
+from models.lebert import LEBERTModel
+from models.mect import MECTModel
+from models.zen import ZENModel
 
 
 def set_seed(seed):
@@ -52,16 +52,16 @@ class NERBenchmark:
 
         # 模型注册表
         self.model_registry = {
-            'BiLSTM-CRF': BiLSTMCRFModel,
+            # 'BiLSTM-CRF': BiLSTMCRFModel,  #good
             # 'BERT-CRF': BERTCRFModel,
-            'CAN-NER': CANNERModel,
-            'Lattice-LSTM': LatticeLSTMModel,
+            # 'CAN-NER': CANNERModel,   #good
+            # 'Lattice-LSTM': LatticeLSTMModel,   #good
             # 'W2NER': W2NERModel,
-            'FLAT': FLATModel,
-            # 'SoftLexicon': SoftLexiconModel,
-            # 'LEBERT': LEBERTModel,
-            # 'MECT': MECTModel,
-            # 'ZEN': ZENModel
+            # 'FLAT': FLATModel,
+            'SoftLexicon': SoftLexiconModel,
+            'LEBERT': LEBERTModel,
+            'MECT': MECTModel,
+            'ZEN': ZENModel
         }
 
     def load_results(self):

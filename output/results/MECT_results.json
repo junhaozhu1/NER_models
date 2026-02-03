@@ -1,0 +1,42 @@
+{
+  "precision": 0,
+  "recall": 0.0,
+  "f1": 0,
+  "accuracy": 0.8835696201064884,
+  "classification_report": "              precision    recall  f1-score   support\n\n           O      0.88      1.00      0.94     152505\n       B-ORG      0.00      0.00      0.00       1331\n       I-ORG      0.00      0.00      0.00       5670\n       B-PER      0.00      0.00      0.00       1973\n       I-PER      0.00      0.00      0.00       3851\n       B-LOC      0.00      0.00      0.00       2877\n       I-LOC      0.00      0.00      0.00       4394\n\n   avg/total      0.13      0.14      0.13     172601\n",
+  "entity_metrics": {
+    "ORG": {
+      "precision": 0,
+      "recall": 0.0,
+      "f1": 0,
+      "support": 1331
+    },
+    "PER": {
+      "precision": 0,
+      "recall": 0.0,
+      "f1": 0,
+      "support": 1973
+    },
+    "LOC": {
+      "precision": 0,
+      "recall": 0.0,
+      "f1": 0,
+      "support": 2877
+    }
+  },
+  "performance_metrics": {
+    "avg_inference_time": 0.23157895568513523,
+    "std_inference_time": 0.013719657694130893,
+    "total_inference_time": 31.726316928863525,
+    "samples_per_second": 137.58294130980175
+  },
+  "error_analysis": {
+    "total_errors": 20096,
+    "error_distribution": {
+      "false_negative": 1.0
+    },
+    "error_counts": {
+      "false_negative": 20096
+    }
+  }
+}
