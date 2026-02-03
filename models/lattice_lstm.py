@@ -1,282 +1,150 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn.utils.rnn import pad_sequence
-from torchcrf import CRF
-import math
-
-
-class WordLSTMCell(nn.Module):
-    """Lattice LSTM中的Word Cell"""
-
-    def __init__(self, input_dim, hidden_dim):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-
-        # 词的门控机制
-        self.W_i = nn.Linear(input_dim, hidden_dim, bias=True)
-        self.W_f = nn.Linear(input_dim, hidden_dim, bias=True)
-        self.W_c = nn.Linear(input_dim, hidden_dim, bias=True)
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        for weight in [self.W_i, self.W_f, self.W_c]:
-            nn.init.xavier_uniform_(weight.weight)
-            nn.init.zeros_(weight.bias)
-
-    def forward(self, x_t):
-        """
-        Args:
-            x_t: 词嵌入 [batch, word_dim]
-        Returns:
-            i_t, f_t, c_t: 门控值和细胞状态
-        """
-        i_t = torch.sigmoid(self.W_i(x_t))
-        f_t = torch.sigmoid(self.W_f(x_t))
-        c_tilde = torch.tanh(self.W_c(x_t))
-        c_t = i_t * c_tilde
-
-        return i_t, f_t, c_t
-
-
-class LatticeLSTMCell(nn.Module):
-    """Lattice LSTM的核心单元"""
-
-    def __init__(self, char_dim, word_dim, hidden_dim):
-        super().__init__()
-        self.char_dim = char_dim
-        self.word_dim = word_dim
-        self.hidden_dim = hidden_dim
-
-        # 字符LSTM参数
-        self.W_char = nn.Linear(char_dim + hidden_dim, 4 * hidden_dim)
-
-        # 词LSTM参数
-        self.word_cell = WordLSTMCell(word_dim, hidden_dim)
-
-        # 额外的门控，用于控制词信息
-        self.W_word_gate = nn.Linear(hidden_dim, hidden_dim)
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        nn.init.xavier_uniform_(self.W_char.weight)
-        nn.init.zeros_(self.W_char.bias)
-        nn.init.xavier_uniform_(self.W_word_gate.weight)
-        nn.init.zeros_(self.W_word_gate.bias)
-
-    def forward(self, char_input, h_prev, c_prev, word_inputs=None, word_positions=None):
-        """
-        Args:
-            char_input: 字符嵌入 [batch, char_dim]
-            h_prev: 上一时刻隐状态 [batch, hidden_dim]
-            c_prev: 上一时刻细胞状态 [batch, hidden_dim]
-            word_inputs: 匹配到的词嵌入列表
-            word_positions: 词的起始位置列表
-        Returns:
-            h_t: 当前隐状态
-            c_t: 当前细胞状态
-        """
-        # 字符LSTM计算
-        lstm_input = torch.cat([char_input, h_prev], dim=-1)
-        gates = self.W_char(lstm_input)
-        i_char, f_char, o_char, c_char = gates.chunk(4, dim=-1)
-
-        i_char = torch.sigmoid(i_char)
-        f_char = torch.sigmoid(f_char)
-        o_char = torch.sigmoid(o_char)
-        c_char = torch.tanh(c_char)
-
-        # 基础细胞状态（只考虑字符）
-        c_t = f_char * c_prev + i_char * c_char
-
-        # 如果有词信息，融合词的贡献
-        if word_inputs is not None and len(word_inputs) > 0:
-            word_c_sum = torch.zeros_like(c_t)
-            word_gate_sum = torch.zeros_like(c_t)
-
-            for word_emb, (start_pos, end_pos) in zip(word_inputs, word_positions):
-                # 计算词的贡献
-                i_word, f_word, c_word = self.word_cell(word_emb)
-
-                # 词的门控权重（考虑词的长度和位置）
-                word_len = end_pos - start_pos
-                alpha = 1.0 / (1.0 + word_len)  # 长词权重降低
-
-                # 累加词的贡献
-                word_c_sum += alpha * i_word * c_word
-                word_gate_sum += alpha * i_word
-
-            # 归一化并融合
-            if word_gate_sum.sum() > 0:
-                word_gate = torch.sigmoid(self.W_word_gate(word_gate_sum))
-                c_t = (1 - word_gate) * c_t + word_gate * word_c_sum
-
-        # 输出门
-        h_t = o_char * torch.tanh(c_t)
-
-        return h_t, c_t
+from .base_model import BaseNERModel
+import time
+from tqdm import tqdm
 
 
 class LatticeLSTM(nn.Module):
-    """完整的Lattice LSTM模型"""
+    def __init__(self, vocab_size, char_vocab_size, word_vocab_size,
+                 embedding_dim, hidden_dim, num_labels, dropout=0.5):
+        super(LatticeLSTM, self).__init__()
 
-    def __init__(self, char_vocab_size, word_vocab_size, num_labels,
-                 char_dim=100, word_dim=100, hidden_dim=256, dropout=0.5):
-        super().__init__()
+        # 字符和词嵌入
+        self.char_embedding = nn.Embedding(char_vocab_size, embedding_dim)
+        self.word_embedding = nn.Embedding(word_vocab_size, embedding_dim)
 
-        self.char_dim = char_dim
-        self.word_dim = word_dim
-        self.hidden_dim = hidden_dim
+        # Lattice LSTM层
+        self.char_lstm = nn.LSTM(embedding_dim, hidden_dim // 2,
+                                 bidirectional=True, batch_first=True)
+        self.word_lstm = nn.LSTM(embedding_dim, hidden_dim // 2,
+                                 bidirectional=True, batch_first=True)
 
-        # 嵌入层
-        self.char_embedding = nn.Embedding(char_vocab_size, char_dim, padding_idx=0)
-        self.word_embedding = nn.Embedding(word_vocab_size, word_dim, padding_idx=0)
+        # 门控机制
+        self.gate = nn.Linear(hidden_dim * 2, hidden_dim)
 
-        # Dropout
         self.dropout = nn.Dropout(dropout)
+        self.hidden2tag = nn.Linear(hidden_dim, num_labels)
 
-        # 前向和后向Lattice LSTM
-        self.forward_cell = LatticeLSTMCell(char_dim, word_dim, hidden_dim)
-        self.backward_cell = LatticeLSTMCell(char_dim, word_dim, hidden_dim)
+    def forward(self, char_ids, word_ids, word_positions, attention_mask, labels=None):
+        # 字符嵌入和LSTM
+        char_embeds = self.char_embedding(char_ids)
+        char_lstm_out, _ = self.char_lstm(char_embeds)
 
-        # 输出层
-        self.hidden2tag = nn.Linear(hidden_dim * 2, num_labels)
-        self.crf = CRF(num_labels, batch_first=True)
+        # 词嵌入和LSTM（如果有词信息）
+        if word_ids is not None:
+            word_embeds = self.word_embedding(word_ids)
+            word_lstm_out, _ = self.word_lstm(word_embeds)
 
-        self.reset_parameters()
+            # 将词信息集成到相应位置
+            batch_size, seq_len, hidden_dim = char_lstm_out.size()
+            integrated_out = char_lstm_out.clone()
 
-    def reset_parameters(self):
-        nn.init.xavier_uniform_(self.char_embedding.weight)
-        nn.init.xavier_uniform_(self.word_embedding.weight)
-        nn.init.xavier_uniform_(self.hidden2tag.weight)
-        nn.init.zeros_(self.hidden2tag.bias)
+            for b in range(batch_size):
+                for w_idx, (start, end) in enumerate(word_positions[b]):
+                    if start < seq_len and end <= seq_len:
+                        # 使用门控机制融合字符和词信息
+                        char_hidden = char_lstm_out[b, start:end].mean(0)
+                        word_hidden = word_lstm_out[b, w_idx]
+                        gate_value = torch.sigmoid(self.gate(torch.cat([char_hidden, word_hidden], dim=-1)))
+                        integrated_out[b, start:end] = gate_value * word_hidden + (1 - gate_value) * char_lstm_out[
+                            b, start:end]
 
-    def forward_lattice_lstm(self, char_embeds, word_ids_list, word_positions_list,
-                             lengths, forward=True):
-        """
-        单向Lattice LSTM的前向传播
-
-        Args:
-            char_embeds: 字符嵌入 [batch, seq_len, char_dim]
-            word_ids_list: 每个位置匹配到的词ID列表
-            word_positions_list: 词的位置信息
-            lengths: 序列长度
-            forward: 是否是前向LSTM
-        """
-        batch_size, seq_len, _ = char_embeds.shape
-        device = char_embeds.device
-
-        # 初始化隐状态
-        h = torch.zeros(batch_size, self.hidden_dim, device=device)
-        c = torch.zeros(batch_size, self.hidden_dim, device=device)
-
-        outputs = []
-
-        # 选择处理顺序
-        if forward:
-            positions = range(seq_len)
-            cell = self.forward_cell
+            lstm_out = integrated_out
         else:
-            positions = range(seq_len - 1, -1, -1)
-            cell = self.backward_cell
+            lstm_out = char_lstm_out
 
-        for pos in positions:
-            char_input = char_embeds[:, pos]
-
-            # 获取当前位置的词信息
-            batch_word_inputs = []
-            batch_word_positions = []
-
-            for batch_idx in range(batch_size):
-                if pos >= lengths[batch_idx]:
-                    batch_word_inputs.append([])
-                    batch_word_positions.append([])
-                    continue
-
-                word_inputs = []
-                word_positions = []
-
-                # 收集以当前位置结尾的所有词
-                if word_ids_list[batch_idx] and pos in word_ids_list[batch_idx]:
-                    for word_id, (start, end) in word_ids_list[batch_idx][pos]:
-                        if word_id > 0:  # 忽略padding
-                            word_emb = self.word_embedding(
-                                torch.tensor([word_id], device=device)
-                            )
-                            word_inputs.append(word_emb)
-                            word_positions.append((start, end))
-
-                batch_word_inputs.append(word_inputs)
-                batch_word_positions.append(word_positions)
-
-            # 更新隐状态
-            new_h = []
-            new_c = []
-
-            for batch_idx in range(batch_size):
-                if pos < lengths[batch_idx]:
-                    h_i, c_i = cell(
-                        char_input[batch_idx:batch_idx + 1],
-                        h[batch_idx:batch_idx + 1],
-                        c[batch_idx:batch_idx + 1],
-                        batch_word_inputs[batch_idx],
-                        batch_word_positions[batch_idx]
-                    )
-                    new_h.append(h_i)
-                    new_c.append(c_i)
-                else:
-                    new_h.append(h[batch_idx:batch_idx + 1])
-                    new_c.append(c[batch_idx:batch_idx + 1])
-
-            h = torch.cat(new_h, dim=0)
-            c = torch.cat(new_c, dim=0)
-            outputs.append(h)
-
-        # 调整输出顺序
-        if not forward:
-            outputs = outputs[::-1]
-
-        return torch.stack(outputs, dim=1)
-
-    def forward(self, char_ids, word_ids_list, word_positions_list, lengths, mask=None):
-        """
-        Args:
-            char_ids: 字符ID [batch, seq_len]
-            word_ids_list: 匹配到的词信息
-            word_positions_list: 词位置信息
-            lengths: 实际长度
-            mask: 掩码
-        """
-        # 字符嵌入
-        char_embeds = self.dropout(self.char_embedding(char_ids))
-
-        # 前向Lattice LSTM
-        forward_out = self.forward_lattice_lstm(
-            char_embeds, word_ids_list, word_positions_list, lengths, forward=True
-        )
-
-        # 后向Lattice LSTM
-        backward_out = self.forward_lattice_lstm(
-            char_embeds, word_ids_list, word_positions_list, lengths, forward=False
-        )
-
-        # 拼接双向输出
-        lstm_out = torch.cat([forward_out, backward_out], dim=-1)
         lstm_out = self.dropout(lstm_out)
-
-        # 计算发射分数
         emissions = self.hidden2tag(lstm_out)
 
-        return emissions
+        if labels is not None:
+            # 计算CRF损失或使用交叉熵
+            loss = nn.CrossEntropyLoss()(emissions.view(-1, emissions.size(-1)), labels.view(-1))
+            return loss
+        else:
+            # 返回预测结果
+            return torch.argmax(emissions, dim=-1)
 
-    def loss(self, char_ids, label_ids, word_ids_list, word_positions_list, lengths, mask):
-        """计算CRF损失"""
-        emissions = self.forward(char_ids, word_ids_list, word_positions_list, lengths, mask)
-        return -self.crf(emissions, label_ids, mask=mask, reduction='mean')
 
-    def predict(self, char_ids, word_ids_list, word_positions_list, lengths, mask):
-        """预测标签序列"""
-        emissions = self.forward(char_ids, word_ids_list, word_positions_list, lengths, mask)
-        return self.crf.decode(emissions, mask=mask)
+class LatticeLSTMModel(BaseNERModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.word_vocab = self.build_word_vocab()
+
+    def build_word_vocab(self):
+        # 构建词汇表（简化版本）
+        return {'<PAD>': 0, '<UNK>': 1}
+
+    def build_model(self, vocab_size: int, num_labels: int):
+        self.model = LatticeLSTM(
+            vocab_size=vocab_size,
+            char_vocab_size=vocab_size,
+            word_vocab_size=len(self.word_vocab),
+            embedding_dim=self.config.EMBEDDING_DIM,
+            hidden_dim=self.config.HIDDEN_DIM,
+            num_labels=num_labels,
+            dropout=self.config.DROPOUT
+        )
+        self.model.to(self.device)
+        return self.model
+
+    def prepare_lattice_input(self, batch):
+        """准备Lattice LSTM的输入"""
+        # 这里简化处理，实际需要词典匹配
+        return {
+            'char_ids': batch['input_ids'],
+            'word_ids': None,  # 简化版本，暂不使用词信息
+            'word_positions': None,
+            'attention_mask': batch['attention_mask'],
+            'labels': batch.get('labels')
+        }
+
+    def train_epoch(self, train_loader, optimizer, criterion=None):
+        self.model.train()
+        total_loss = 0
+
+        for batch in tqdm(train_loader, desc="Training Lattice LSTM"):
+            optimizer.zero_grad()
+
+            lattice_input = self.prepare_lattice_input(batch)
+            lattice_input = {k: v.to(self.device) if v is not None and hasattr(v, 'to') else v
+                             for k, v in lattice_input.items()}
+
+            loss = self.model(**lattice_input)
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+
+        return total_loss / len(train_loader)
+
+    def evaluate(self, test_loader, metrics):
+        self.model.eval()
+        metrics.reset()
+
+        with torch.no_grad():
+            for batch in tqdm(test_loader, desc="Evaluating Lattice LSTM"):
+                lattice_input = self.prepare_lattice_input(batch)
+                lattice_input = {k: v.to(self.device) if v is not None and hasattr(v, 'to') else v
+                                 for k, v in lattice_input.items() if k != 'labels'}
+
+                original_labels = batch['original_labels']
+
+                start_time = time.time()
+                predictions = self.model(**lattice_input)
+                batch_time = time.time() - start_time
+
+                # 转换预测结果
+                pred_labels = []
+                for i, pred_seq in enumerate(predictions):
+                    pred_label_seq = []
+                    for j in range(len(original_labels[i])):
+                        if j < pred_seq.size(0):
+                            pred_label_seq.append(test_loader.dataset.id2label[pred_seq[j].item()])
+                        else:
+                            pred_label_seq.append('O')
+                    pred_labels.append(pred_label_seq)
+
+                metrics.add_batch(pred_labels, original_labels, batch_time)
+
+        return metrics.compute()

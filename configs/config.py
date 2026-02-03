@@ -11,7 +11,7 @@ class Config:
     MAX_SEQ_LENGTH = 128
     BATCH_SIZE = 32
     LEARNING_RATE = 1e-3
-    EPOCHS = 50
+    EPOCHS = 5
     DROPOUT = 0.5
 
     # 词向量参数
