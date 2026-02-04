@@ -56,12 +56,12 @@ class NERBenchmark:
             # 'BERT-CRF': BERTCRFModel,
             # 'CAN-NER': CANNERModel,   #good
             # 'Lattice-LSTM': LatticeLSTMModel,   #good
-            # 'W2NER': W2NERModel,
-            # 'FLAT': FLATModel,
-            'SoftLexicon': SoftLexiconModel,
-            'LEBERT': LEBERTModel,
-            'MECT': MECTModel,
-            'ZEN': ZENModel
+            'W2NER': W2NERModel,
+            'FLAT': FLATModel,
+            # 'SoftLexicon': SoftLexiconModel,
+            # 'LEBERT': LEBERTModel,
+            # 'MECT': MECTModel,
+            # 'ZEN': ZENModel
         }
 
     def load_results(self):
