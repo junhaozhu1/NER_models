@@ -141,7 +141,7 @@
 
 ### 3.1 整体性能对比
 
-![Screenshot 2026-02-05 at 12.14.22](/Users/zzz/zjh/internship/3/NER_models/整体实验框架架构.assets/Screenshot 2026-02-05 at 12.14.22.png)
+![Screenshot 2026-02-05 at 12.14.22](/Users/zzz/zjh/internship/3/NER_models/NER模型基准测试报告.assets/Screenshot 2026-02-05 at 12.14.22.png)
 
 从测试结果来看，各模型表现出不同的性能特征：
 
